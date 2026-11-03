@@ -254,7 +254,6 @@
       border-top-left-radius: 2px;
       border: 1px solid var(--border);
     }
-    /* AI 回覆排版細節：段落、粗體、清單 */
     .chat-bubble p { margin-bottom: 10px; }
     .chat-bubble p:last-child { margin-bottom: 0; }
     .chat-bubble ul, .chat-bubble ol { padding-left: 20px; margin-bottom: 10px; }
@@ -264,7 +263,6 @@
       background: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; border: 1px solid var(--border);
     }
 
-    /* 思考動畫 */
     .typing-indicator {
       display: flex;
       gap: 5px;
@@ -427,6 +425,7 @@
     let currentMarkmap = null;
     let pendingMindmapMd = null;
     let currentFileName = '';
+    let currentTimestamp = null; // 記錄當前紀錄的時間戳記
     let currentFullData = null;
     let currentChatHistory = [];
     const converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
@@ -445,10 +444,7 @@
 
     function saveHistoryItem(item) {
       const history = getHistory();
-      const existingIdx = history.findIndex(h => h.fileName === item.fileName);
-      if (existingIdx >= 0) {
-        history.splice(existingIdx, 1);
-      }
+      // 直接新增至前方，完整保留同名檔案的所有歷史紀錄
       history.unshift(item);
       if (history.length > 20) history.pop();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
@@ -500,6 +496,7 @@
       if (!record) return;
 
       currentFileName = record.fileName;
+      currentTimestamp = record.timestamp;
       currentFullData = record.data;
       currentChatHistory = record.chatHistory || [];
 
@@ -1111,9 +1108,9 @@ ${currentFullData.transcriptText}
     }
 
     function updateCurrentHistoryChat() {
-      if (!currentFileName) return;
+      if (!currentTimestamp) return;
       const history = getHistory();
-      const item = history.find(h => h.fileName === currentFileName);
+      const item = history.find(h => h.timestamp === currentTimestamp);
       if (item) {
         item.chatHistory = currentChatHistory;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
@@ -1188,6 +1185,7 @@ ${currentFullData.transcriptText}
       }
 
       currentFileName = file.name;
+      currentTimestamp = Date.now(); // 為本次分析建立唯一時間戳記
       const btn = $('generateBtn');
       btn.disabled = true;
       $('results').style.display = 'none';
@@ -1227,7 +1225,7 @@ ${currentFullData.transcriptText}
 
         saveHistoryItem({
           fileName: currentFileName,
-          timestamp: Date.now(),
+          timestamp: currentTimestamp,
           transcript: transcript,
           summaryText: parsedResult.notesMd.slice(0, 100),
           data: parsedResult,
@@ -1271,6 +1269,7 @@ ${currentFullData.transcriptText}
       showFileInfo(null);
       pendingMindmapMd = null;
       currentFileName = '';
+      currentTimestamp = null;
       currentFullData = null;
       currentChatHistory = [];
       if (currentMarkmap) {
