@@ -360,6 +360,13 @@
       <label>選擇音訊檔案（支援 MP3、WAV、M4A、OGG 等）</label>
       <input type="file" id="audioFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.flac" />
       <div class="hint">建議單一檔案不超過 25MB。超過約 30 分鐘的內容會自動分段整理，完整保留逐字稿。</div>
+      
+      <!-- 雙模型聯合分析選項 -->
+      <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="dualModelCheckbox" checked style="width: auto; cursor: pointer;" />
+        <label for="dualModelCheckbox" style="display: inline; margin-bottom: 0; cursor: pointer; color: var(--text);">啟用雙模型聯合分析（使用 V3.2-Ultra 多方言轉寫 + Diarize-V3.0 聲紋人物分離）</label>
+      </div>
+
       <div id="fileInfo"></div>
 
       <div style="margin-top: 22px; display: flex; gap: 12px; flex-wrap: wrap;">
@@ -414,7 +421,8 @@
     // ========== 矽基流動設定 ==========
     const API_BASE_URL = "https://api.siliconflow.cn/v1";
     const API_KEY      = "sk-kqrsiandfirxhbknbthmkibjqlqncpwdyqpqxtinddzkpigz";
-    const WHISPER_MODEL = "XingChenAGI/XingChenASR-V3.2-Ultra";
+    const WHISPER_MODEL = "XingChenAGI/XingChenASR-V3.2-Ultra"; // 專精高準確度文字與多方言
+    const DIARIZE_MODEL = "XingChenAGI/XingChenASR-Diarize-V3.0"; // 專精聲紋說話者分離
     const LLM_MODEL      = "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B";
     // ==================================
 
@@ -425,7 +433,7 @@
     let currentMarkmap = null;
     let pendingMindmapMd = null;
     let currentFileName = '';
-    let currentTimestamp = null; // 記錄當前紀錄的時間戳記
+    let currentTimestamp = null;
     let currentFullData = null;
     let currentChatHistory = [];
     const converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
@@ -444,7 +452,6 @@
 
     function saveHistoryItem(item) {
       const history = getHistory();
-      // 直接新增至前方，完整保留同名檔案的所有歷史紀錄
       history.unshift(item);
       if (history.length > 20) history.pop();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
@@ -529,7 +536,6 @@
       renderHistoryList(e.target.value);
     });
 
-    // ========== 依檔案大小估算處理時間 ==========
     function estimateProcessTime(sizeBytes) {
       const sizeMB = sizeBytes / (1024 * 1024);
       const estChunks = Math.max(1, Math.ceil((sizeMB * 2500) / CHUNK_SIZE));
@@ -576,7 +582,6 @@
       el.classList.add('visible');
     }
 
-    // ========== 計時器 ==========
     let startTime = null;
     let timerInterval = null;
 
@@ -682,10 +687,11 @@
       });
     });
 
-    async function transcribe(file) {
+    // ========== 雙模型平行/聯合轉寫請求 ==========
+    async function fetchASR(file, modelName) {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('model', WHISPER_MODEL);
+      formData.append('model', modelName);
 
       const res = await fetch(`${API_BASE_URL}/audio/transcriptions`, {
         method: 'POST',
@@ -695,13 +701,79 @@
 
       if (!res.ok) {
         const err = await res.text();
-        throw new Error(`語音轉文字失敗 (${res.status})：${err}`);
+        throw new Error(`模型 ${modelName} 語音轉寫失敗 (${res.status})：${err}`);
       }
 
       const data = await res.json();
       let text = data.text || (typeof data === 'string' ? data : '') || '';
-      text = converter(text);
-      return text;
+      return converter(text);
+    }
+
+    async function transcribeDualMode(file) {
+      const useDual = $('dualModelCheckbox').checked;
+
+      if (!useDual) {
+        // 單用 V3.2-Ultra
+        setStatus('① 正在進行精準語音轉文字（V3.2-Ultra）…', 'info');
+        return await fetchASR(file, WHISPER_MODEL);
+      }
+
+      // 雙模型平行呼叫
+      setStatus('① 正在平行呼叫雙模型（V3.2-Ultra 精準文字 + Diarize-V3.0 聲紋分類）…', 'info');
+      const [ultraText, diarizeText] = await Promise.all([
+        fetchASR(file, WHISPER_MODEL),
+        fetchASR(file, DIARIZE_MODEL).catch(e => {
+          console.warn('Diarize 模型請求失敗，將僅退回 Ultra 文本', e);
+          return '';
+        })
+      ]);
+
+      if (!diarizeText) return ultraText;
+
+      // 利用 LLM 智慧結合 V3.2-Ultra 的文字與 Diarize-V3.0 的人名對籤
+      setStatus('① 正在融合雙模型成果（精準文字 + 聲紋說話者對齊）…', 'info');
+      const prompt = `你有兩份針對同一個音訊的轉寫結果：
+
+【精準文字內容 (V3.2-Ultra，文字精準但缺少說話者編號)】：
+${ultraText.slice(0, 15000)}
+
+【聲紋分離內容 (Diarize-V3.0，包含 1: / 2: 說話者標籤)】：
+${diarizeText.slice(0, 15000)}
+
+請將【聲紋分離內容】中的說話者標籤（如 1: / 2:）完美套用到【精準文字內容】中。
+輸出原則：
+1. 必須保持【精準文字內容】的精確字詞與繁體中文語法。
+2. 每當更換說話者時，換行並加上對應的數字編號標籤（如 1: 或 2:）。
+3. 絕對禁止出現任何簡體字。直接輸出對齊後的逐字稿，不要多餘解釋。`;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: LLM_MODEL,
+            messages: [
+              { role: 'system', content: 'You are a professional audio transcript alignment expert. Output strictly in Traditional Chinese.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.1,
+            max_tokens: 5000
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          let merged = data.choices[0].message.content.trim();
+          return converter(merged);
+        }
+      } catch (e) {
+        console.warn('雙模型對齊融合失敗，改用 Diarize 直接結果', e);
+      }
+
+      return diarizeText;
     }
 
     async function generateChunkContent(chunkText, chunkIndex, totalChunks) {
@@ -978,14 +1050,46 @@ ${combinedNotes.slice(0, 20000)}
       $('notesContent').innerHTML = simpleMarkdownToHtml(md);
     }
 
+    // ========== 渲染：逐字稿 (美化說話者標註) ==========
     function renderTranscript(text, rawFallback) {
       const content = (text && text.length > 10) ? text : rawFallback;
       const charCount = (content || '').length;
       const approxMin = Math.max(1, Math.round(charCount / 180));
+
+      const speakerMatches = Array.from(content.matchAll(/(?:^|\n)(\d+):/g));
+      const uniqueSpeakers = [...new Set(speakerMatches.map(m => m[1]))].sort((a,b) => a - b);
+
+      let speakerHeaderHtml = '';
+      if (uniqueSpeakers.length > 0) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+        const tags = uniqueSpeakers.map((sp, idx) => {
+          const label = letters[idx] || sp;
+          return `<span style="background: #0c4a6e; color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; border: 1px solid #0284c7;">說話者 ${label} (編號 ${sp})</span>`;
+        }).join(' ');
+
+        speakerHeaderHtml = `
+          <div style="margin-bottom: 14px; padding: 12px; background: #1e293b; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 6px;">👥 偵測到的說話者列表：</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">${tags}</div>
+          </div>
+        `;
+      }
+
+      let formattedBody = escapeHtml(content);
+      if (uniqueSpeakers.length > 0) {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+        uniqueSpeakers.forEach((sp, idx) => {
+          const label = letters[idx] || sp;
+          const reg = new RegExp(`(?:^|\\n)${sp}:`, 'g');
+          formattedBody = formattedBody.replace(reg, `\n\n<strong style="color: #38bdf8; display: inline-block; margin-top: 8px;">【說話者 ${label}】</strong> `);
+        });
+      }
+
       $('transcriptBox').innerHTML = `
         <div class="raw-transcript-box">
           <span class="point-num">完整逐字稿（約 ${charCount.toLocaleString()} 字｜約 ${approxMin} 分鐘）</span>
-          <div class="raw-transcript-body">${escapeHtml(content || '（無）')}</div>
+          ${speakerHeaderHtml}
+          <div class="raw-transcript-body" style="line-height: 1.8;">${formattedBody.trim()}</div>
         </div>
       `;
     }
@@ -1185,7 +1289,7 @@ ${currentFullData.transcriptText}
       }
 
       currentFileName = file.name;
-      currentTimestamp = Date.now(); // 為本次分析建立唯一時間戳記
+      currentTimestamp = Date.now();
       const btn = $('generateBtn');
       btn.disabled = true;
       $('results').style.display = 'none';
@@ -1198,8 +1302,7 @@ ${currentFullData.transcriptText}
       startTimer();
 
       try {
-        setStatus('① 正在語音轉文字，請稍候…', 'info');
-        const transcript = await transcribe(file);
+        const transcript = await transcribeDualMode(file);
         if (!transcript || transcript.trim().length < 5) {
           throw new Error('語音轉文字結果為空，請確認音訊是否清晰、有人聲');
         }
