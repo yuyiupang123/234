@@ -412,7 +412,10 @@
       }
 
       const data = await res.json();
-      return data.text || (typeof data === 'string' ? data : '') || '';
+      let text = data.text || (typeof data === 'string' ? data : '') || '';
+      // ASR 預設常是簡體，強制轉成繁體（香港字形）
+      text = converter(text);
+      return text;
     }
 
     // ========== 單段 LLM 整理 ==========
@@ -483,7 +486,7 @@ ${chunkText}
           messages: [
             {
               role: 'system',
-              content: 'You are a professional Traditional Chinese editor. You MUST output ALL text in strict Traditional Chinese. Never use simplified Chinese characters.'
+              content: 'You are a professional Traditional Chinese editor. You MUST output ALL text in strict Traditional Chinese (Hong Kong / Taiwan style). Never use any simplified Chinese characters. If the input contains simplified characters, convert them completely.'
             },
             { role: 'user', content: prompt }
           ],
@@ -610,7 +613,7 @@ ${combinedNotes.slice(0, 20000)}
         points: allPoints,
         notesMd: notesParts.join('\n\n---\n\n'),
         mindmapMd,
-        // 逐字稿一律使用 ASR 完整原文，確保不遺漏
+        // 逐字稿一律使用 ASR 完整原文（已轉繁體），確保不遺漏
         transcriptText: fullRawTranscript
       };
     }
@@ -625,7 +628,7 @@ ${combinedNotes.slice(0, 20000)}
         setStatus('② 正在整理重點與心智圖（繁體中文）…', 'info');
         const aiText = await generateChunkContent(chunks[0], 0, 1);
         const parsed = parseAIResponse(aiText);
-        // 逐字稿以完整 ASR 為準
+        // 逐字稿以完整 ASR（已轉繁體）為準
         parsed.transcriptText = fullTranscript;
         return parsed;
       }
