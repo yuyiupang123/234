@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>音訊 → 重點整理與心智圖</title>
+  <title>音訊 → 重點整理、心智圖與 AI 對話</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18"></script>
   <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18"></script>
@@ -28,18 +28,25 @@
       border-radius: 12px; padding: 22px; margin-bottom: 20px;
     }
     label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 8px; }
-    input[type="file"] {
+    input[type="file"], input[type="text"] {
       width: 100%; background: #0f172a; border: 1px solid var(--border);
       border-radius: 8px; color: var(--text); padding: 12px; font-size: 0.95rem;
+    }
+    input[type="text"]:focus {
+      outline: none; border-color: var(--accent);
     }
     .btn {
       background: var(--accent); color: #0f172a; border: none;
       border-radius: 8px; padding: 12px 28px; font-weight: 600;
-      font-size: 1rem; cursor: pointer;
+      font-size: 1rem; cursor: pointer; transition: opacity 0.2s;
     }
+    .btn:hover { opacity: 0.9; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-secondary {
       background: transparent; border: 1px solid var(--border); color: var(--text);
+    }
+    .btn-danger {
+      background: #7f1d1d; color: #fca5a5; border: none; padding: 6px 12px; font-size: 0.85rem; border-radius: 6px; cursor: pointer;
     }
     #status {
       margin-top: 14px; font-size: 0.95rem; min-height: 28px;
@@ -91,6 +98,7 @@
     .tab {
       background: transparent; border: none; color: var(--muted);
       padding: 8px 16px; cursor: pointer; border-radius: 6px; font-size: 0.95rem;
+      transition: all 0.2s;
     }
     .tab.active { background: #334155; color: var(--text); }
     .panel { display: none; }
@@ -174,12 +182,181 @@
       max-height: 520px;
       overflow: auto;
     }
+
+    /* ========== Gemini 風格 AI 聊天室介面 ========== */
+    .chat-container {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 600px;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 10px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .chat-message-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      max-width: 90%;
+    }
+    .chat-message-row.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .chat-message-row.ai {
+      align-self: flex-start;
+    }
+    .chat-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+      font-weight: bold;
+    }
+    .chat-message-row.user .chat-avatar {
+      background: #38bdf8;
+      color: #0f172a;
+    }
+    .chat-message-row.ai .chat-avatar {
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      color: #0f172a;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+    }
+    .chat-bubble {
+      padding: 14px 18px;
+      border-radius: 14px;
+      font-size: 0.98rem;
+      line-height: 1.75;
+      word-break: break-word;
+    }
+    .chat-message-row.user .chat-bubble {
+      background: #1e3a8a;
+      color: #e2e8f0;
+      border-top-right-radius: 2px;
+      border: 1px solid #3b82f6;
+    }
+    .chat-message-row.ai .chat-bubble {
+      background: #1e293b;
+      color: var(--text);
+      border-top-left-radius: 2px;
+      border: 1px solid var(--border);
+    }
+    /* AI 回覆排版細節：段落、粗體、清單 */
+    .chat-bubble p { margin-bottom: 10px; }
+    .chat-bubble p:last-child { margin-bottom: 0; }
+    .chat-bubble ul, .chat-bubble ol { padding-left: 20px; margin-bottom: 10px; }
+    .chat-bubble li { margin-bottom: 5px; }
+    .chat-bubble strong { color: var(--accent); font-weight: 600; }
+    .chat-bubble code {
+      background: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; border: 1px solid var(--border);
+    }
+
+    /* 思考動畫 */
+    .typing-indicator {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      padding: 4px 8px;
+    }
+    .typing-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--muted);
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1.0); }
+    }
+
+    .chat-input-area {
+      display: flex;
+      gap: 10px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      align-items: center;
+    }
+    .chat-input-area input {
+      background: transparent;
+      border: none;
+      padding: 8px;
+      font-size: 0.98rem;
+    }
+    .chat-input-area input:focus {
+      outline: none;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .history-item {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .history-info {
+      cursor: pointer;
+      flex: 1;
+    }
+    .history-title {
+      font-weight: 600;
+      color: var(--accent);
+      font-size: 0.98rem;
+      margin-bottom: 4px;
+    }
+    .history-meta {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🎧 音訊 → 重點整理與心智圖</h1>
-    <p class="subtitle">上傳音訊，自動轉錄並產生重點、筆記與心智圖（支援長音訊分段處理）</p>
+    <p class="subtitle">上傳音訊，自動轉錄並產生重點、筆記與心智圖（支援長音訊分段處理、Gemini 風格 AI 對話與歷史紀錄搜尋）</p>
+
+    <!-- 歷史紀錄查詢卡片 -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+        <label style="margin-bottom: 0; font-weight: 600; color: var(--text);">📂 歷史紀錄與搜尋</label>
+        <button class="btn btn-secondary" id="toggleHistoryBtn" style="padding: 6px 14px; font-size: 0.88rem;">展開／收合紀錄</button>
+      </div>
+      <div id="historySection" style="display: none;">
+        <div style="margin-bottom: 12px;">
+          <input type="text" id="historySearchInput" placeholder="輸入關鍵字搜尋歷史紀錄..." />
+        </div>
+        <div class="history-list" id="historyListContainer">
+          <div class="empty-hint">尚無歷史紀錄</div>
+        </div>
+      </div>
+    </div>
 
     <div class="card">
       <label>選擇音訊檔案（支援 MP3、WAV、M4A、OGG 等）</label>
@@ -201,6 +378,7 @@
         <button class="tab" data-tab="notes">整理筆記</button>
         <button class="tab" data-tab="mindmap">心智圖</button>
         <button class="tab" data-tab="transcript">逐字稿</button>
+        <button class="tab" data-tab="chat">✨ AI 檔案對話</button>
       </div>
 
       <div id="panel-points" class="panel active">
@@ -215,6 +393,22 @@
       <div id="panel-transcript" class="panel">
         <div id="transcriptBox"></div>
       </div>
+      <div id="panel-chat" class="panel">
+        <div class="chat-container">
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-message-row ai">
+              <div class="chat-avatar">AI</div>
+              <div class="chat-bubble">
+                <p>你好！我是基於此音訊檔案內容的 <strong>Gemini 智慧助手</strong>。你可以隨時向我提問關於這個檔案的細節、要求詳細解釋或進行延伸討論！</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="向 AI 詢問關於此檔案的任何問題..." />
+            <button class="btn" id="sendChatBtn" style="padding: 10px 20px;">發送</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -223,24 +417,125 @@
     const API_BASE_URL = "https://api.siliconflow.cn/v1";
     const API_KEY      = "sk-kqrsiandfirxhbknbthmkibjqlqncpwdyqpqxtinddzkpigz";
     const WHISPER_MODEL = "XingChenAGI/XingChenASR-V3.2-Ultra";
-    const LLM_MODEL     = "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B";
+    const LLM_MODEL      = "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B";
     // ==================================
 
-    // 每段送給 LLM 的最大字元數（繁中約 15～20 分鐘內容）
     const CHUNK_SIZE = 10000;
-    // 段落重疊字元，避免句子被切開
     const CHUNK_OVERLAP = 300;
 
     const $ = id => document.getElementById(id);
     let currentMarkmap = null;
     let pendingMindmapMd = null;
+    let currentFileName = '';
+    let currentFullData = null;
+    let currentChatHistory = [];
     const converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
+
+    // ========== 歷史紀錄相關函式 ==========
+    const STORAGE_KEY = 'audio_mindmap_history_v1';
+
+    function getHistory() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveHistoryItem(item) {
+      const history = getHistory();
+      const existingIdx = history.findIndex(h => h.fileName === item.fileName);
+      if (existingIdx >= 0) {
+        history.splice(existingIdx, 1);
+      }
+      history.unshift(item);
+      if (history.length > 20) history.pop();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      renderHistoryList();
+    }
+
+    function deleteHistoryItem(timestamp, event) {
+      event.stopPropagation();
+      let history = getHistory();
+      history = history.filter(h => h.timestamp !== timestamp);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      renderHistoryList();
+    }
+
+    function renderHistoryList(filterKeyword = '') {
+      const container = $('historyListContainer');
+      const history = getHistory();
+      const filtered = history.filter(h => 
+        h.fileName.toLowerCase().includes(filterKeyword.toLowerCase()) ||
+        (h.summaryText && h.summaryText.toLowerCase().includes(filterKeyword.toLowerCase()))
+      );
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-hint">沒有找到符合的歷史紀錄</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      filtered.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        const dateStr = new Date(item.timestamp).toLocaleString();
+        div.innerHTML = `
+          <div class="history-info">
+            <div class="history-title">🎵 ${escapeHtml(item.fileName)}</div>
+            <div class="history-meta">時間：${dateStr} ｜ 約 ${(item.transcript || '').length} 字</div>
+          </div>
+          <button class="btn-danger" onclick="window.loadHistoryRecord(${item.timestamp}, event)">載入</button>
+          <button class="btn-danger" style="background:#450a0a; color:#f87171;" onclick="window.removeHistoryRecord(${item.timestamp}, event)">刪除</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    window.loadHistoryRecord = function(timestamp, event) {
+      event.stopPropagation();
+      const history = getHistory();
+      const record = history.find(h => h.timestamp === timestamp);
+      if (!record) return;
+
+      currentFileName = record.fileName;
+      currentFullData = record.data;
+      currentChatHistory = record.chatHistory || [];
+
+      renderPoints(currentFullData.points);
+      renderNotes(currentFullData.notesMd);
+      renderTranscript(currentFullData.transcriptText, record.transcript);
+      pendingMindmapMd = currentFullData.mindmapMd || null;
+
+      renderChatMessages();
+
+      $('results').style.display = 'block';
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelector('[data-tab="points"]').classList.add('active');
+      $('panel-points').classList.add('active');
+
+      setStatus(`已成功載入歷史紀錄：${record.fileName}`, 'success');
+    };
+
+    window.removeHistoryRecord = function(timestamp, event) {
+      deleteHistoryItem(timestamp, event);
+    };
+
+    $('toggleHistoryBtn').addEventListener('click', () => {
+      const sec = $('historySection');
+      sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+    });
+
+    $('historySearchInput').addEventListener('input', (e) => {
+      renderHistoryList(e.target.value);
+    });
 
     // ========== 依檔案大小估算處理時間 ==========
     function estimateProcessTime(sizeBytes) {
       const sizeMB = sizeBytes / (1024 * 1024);
-      // 長音訊會多分段，時間隨大小與預估段數上升
-      const estChunks = Math.max(1, Math.ceil((sizeMB * 2500) / CHUNK_SIZE)); // 粗估字數
+      const estChunks = Math.max(1, Math.ceil((sizeMB * 2500) / CHUNK_SIZE));
       let lowSec  = Math.round(30 + sizeMB * 12 + (estChunks - 1) * 25);
       let highSec = Math.round(50 + sizeMB * 22 + (estChunks - 1) * 45);
       lowSec  = Math.max(25, lowSec);
@@ -343,7 +638,6 @@
         .replace(/"/g, '&quot;');
     }
 
-    // ========== 文字分段 ==========
     function splitTranscriptIntoChunks(text, maxLen = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
       const cleaned = (text || '').trim();
       if (!cleaned) return [];
@@ -353,7 +647,6 @@
       let start = 0;
       while (start < cleaned.length) {
         let end = Math.min(start + maxLen, cleaned.length);
-        // 盡量在句號、問號、驚嘆號或換行處切開
         if (end < cleaned.length) {
           const slice = cleaned.slice(start, end);
           const breakPts = ['。', '？', '！', '；', '\n', '.', '?', '!'];
@@ -371,14 +664,12 @@
       return chunks.filter(c => c.length > 0);
     }
 
-    // ========== 檔案選擇 ==========
     $('audioFile').addEventListener('change', () => {
       const file = $('audioFile').files[0];
       showFileInfo(file);
       setStatus(file ? '已選擇檔案，可開始產生' : '準備就緒，請選擇音訊檔案', 'info');
     });
 
-    // ========== 分頁切換 ==========
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -394,7 +685,6 @@
       });
     });
 
-    // ========== 語音轉文字 ==========
     async function transcribe(file) {
       const formData = new FormData();
       formData.append('file', file);
@@ -413,12 +703,10 @@
 
       const data = await res.json();
       let text = data.text || (typeof data === 'string' ? data : '') || '';
-      // ASR 預設常是簡體，強制轉成繁體（香港字形）
       text = converter(text);
       return text;
     }
 
-    // ========== 單段 LLM 整理 ==========
     async function generateChunkContent(chunkText, chunkIndex, totalChunks) {
       const partLabel = totalChunks > 1
         ? `（這是第 ${chunkIndex + 1} / ${totalChunks} 段，請只整理本段內容）`
@@ -509,7 +797,6 @@ ${chunkText}
       return converter(rawContent);
     }
 
-    // ========== 從合併筆記產生統一心智圖 ==========
     async function generateUnifiedMindmap(combinedNotes) {
       const prompt = `你是專業繁體中文筆記助手。請根據以下已整理的筆記，產出一份適合心智圖的階層 Markdown。
 【絕對指令】全部使用繁體中文，禁止簡體字。
@@ -557,7 +844,6 @@ ${combinedNotes.slice(0, 20000)}
       return md || combinedNotes;
     }
 
-    // ========== 解析單段 AI 回覆 ==========
     function parseAIResponse(text) {
       let points = [];
       let notesMd = '';
@@ -595,7 +881,6 @@ ${combinedNotes.slice(0, 20000)}
       return { points, notesMd, mindmapMd, transcriptText };
     }
 
-    // ========== 合併多段結果 ==========
     function mergeChunkResults(results, fullRawTranscript) {
       const allPoints = [];
       const notesParts = [];
@@ -617,12 +902,10 @@ ${combinedNotes.slice(0, 20000)}
         points: allPoints,
         notesMd: notesParts.join('\n\n---\n\n'),
         mindmapMd,
-        // 逐字稿一律使用 ASR 完整原文（已轉繁體），確保不遺漏
         transcriptText: fullRawTranscript
       };
     }
 
-    // ========== 長音訊分段主流程 ==========
     async function generateContentSegmented(fullTranscript) {
       const chunks = splitTranscriptIntoChunks(fullTranscript);
       const total = chunks.length;
@@ -632,7 +915,6 @@ ${combinedNotes.slice(0, 20000)}
         setStatus('② 正在整理重點與心智圖（繁體中文）…', 'info');
         const aiText = await generateChunkContent(chunks[0], 0, 1);
         const parsed = parseAIResponse(aiText);
-        // 逐字稿以完整 ASR（已轉繁體）為準
         parsed.transcriptText = fullTranscript;
         return parsed;
       }
@@ -647,7 +929,6 @@ ${combinedNotes.slice(0, 20000)}
       setStatus('③ 正在合併各段並產生統一心智圖…', 'info');
       const merged = mergeChunkResults(results, fullTranscript);
 
-      // 用合併後的筆記再產一份統一心智圖
       if (merged.notesMd && merged.notesMd.length > 50) {
         try {
           merged.mindmapMd = await generateUnifiedMindmap(merged.notesMd);
@@ -658,7 +939,6 @@ ${combinedNotes.slice(0, 20000)}
       return merged;
     }
 
-    // ========== 渲染：重點 ==========
     function renderPoints(points) {
       const wrap = $('pointsList');
       wrap.innerHTML = '';
@@ -677,9 +957,8 @@ ${combinedNotes.slice(0, 20000)}
       });
     }
 
-    // ========== 渲染：筆記 ==========
     function simpleMarkdownToHtml(md) {
-      if (!md) return '<p class="empty-hint">尚無整理筆記</p>';
+      if (!md) return '<p class="empty-hint">尚無內容</p>';
       let html = escapeHtml(md);
       html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
       html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
@@ -702,7 +981,6 @@ ${combinedNotes.slice(0, 20000)}
       $('notesContent').innerHTML = simpleMarkdownToHtml(md);
     }
 
-    // ========== 渲染：逐字稿 ==========
     function renderTranscript(text, rawFallback) {
       const content = (text && text.length > 10) ? text : rawFallback;
       const charCount = (content || '').length;
@@ -714,6 +992,138 @@ ${combinedNotes.slice(0, 20000)}
         </div>
       `;
     }
+
+    // ========== Gemini 風格聊天室渲染與互動 ==========
+    function renderChatMessages() {
+      const container = $('chatMessages');
+      container.innerHTML = `
+        <div class="chat-message-row ai">
+          <div class="chat-avatar">AI</div>
+          <div class="chat-bubble">
+            <p>你好！我是基於此音訊檔案內容的 <strong>Gemini 智慧助手</strong>。你可以隨時向我提問關於這個檔案的細節、要求詳細解釋或進行延伸討論！</p>
+          </div>
+        </div>
+      `;
+      currentChatHistory.forEach(msg => {
+        const row = document.createElement('div');
+        row.className = `chat-message-row ${msg.role === 'user' ? 'user' : 'ai'}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'chat-avatar';
+        avatar.textContent = msg.role === 'user' ? '我' : 'AI';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble';
+
+        if (msg.role === 'user') {
+          bubble.textContent = msg.content;
+        } else {
+          bubble.innerHTML = simpleMarkdownToHtml(msg.content);
+        }
+
+        row.appendChild(avatar);
+        row.appendChild(bubble);
+        container.appendChild(row);
+      });
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendChatMessage() {
+      const input = $('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+      if (!currentFullData) {
+        alert('請先上傳並產生音訊報告後才能進行對話！');
+        return;
+      }
+
+      input.value = '';
+      currentChatHistory.push({ role: 'user', content: text });
+      renderChatMessages();
+
+      const container = $('chatMessages');
+      const loadingRow = document.createElement('div');
+      loadingRow.className = 'chat-message-row ai';
+      loadingRow.innerHTML = `
+        <div class="chat-avatar">AI</div>
+        <div class="chat-bubble">
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+      `;
+      container.appendChild(loadingRow);
+      container.scrollTop = container.scrollHeight;
+
+      try {
+        const contextPrompt = `以下是音訊檔案的完整整理筆記與逐字稿，供你作為回答依據：
+【筆記內容】：
+${currentFullData.notesMd}
+
+【完整逐字稿】：
+${currentFullData.transcriptText}
+`;
+
+        const messages = [
+          {
+            role: 'system',
+            content: '你是一個專業、親切的繁體中文 AI 助理。請根據提供的音訊筆記與逐字稿內容，給出【結構完整、分段清晰、豐富詳細】的回覆（禁止只用一句話敷衍）。請適度使用 **粗體** 來強調關鍵字、核心詞彙、重要決策或數字，並使用條列式（Bullet points）來使內容易於閱讀。必須使用繁體中文。'
+          },
+          { role: 'user', content: contextPrompt }
+        ];
+
+        currentChatHistory.slice(-6).forEach(m => {
+          messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content });
+        });
+
+        const res = await fetch(`${API_BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: LLM_MODEL,
+            messages: messages,
+            temperature: 0.4,
+            max_tokens: 3000
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error('對話請求失敗');
+        }
+
+        const data = await res.json();
+        let aiReply = data.choices[0].message.content.trim();
+        aiReply = converter(aiReply);
+
+        currentChatHistory.push({ role: 'assistant', content: aiReply });
+        updateCurrentHistoryChat();
+
+      } catch (err) {
+        console.error(err);
+        currentChatHistory.push({ role: 'assistant', content: '抱歉，發生了一點錯誤，請稍後再試。' });
+      }
+      renderChatMessages();
+    }
+
+    function updateCurrentHistoryChat() {
+      if (!currentFileName) return;
+      const history = getHistory();
+      const item = history.find(h => h.fileName === currentFileName);
+      if (item) {
+        item.chatHistory = currentChatHistory;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      }
+    }
+
+    $('sendChatBtn').addEventListener('click', sendChatMessage);
+    $('chatInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendChatMessage();
+    });
 
     // ========== 心智圖 ==========
     window.renderMarkmap = function(markdown) {
@@ -777,6 +1187,7 @@ ${combinedNotes.slice(0, 20000)}
         return;
       }
 
+      currentFileName = file.name;
       const btn = $('generateBtn');
       btn.disabled = true;
       $('results').style.display = 'none';
@@ -795,22 +1206,33 @@ ${combinedNotes.slice(0, 20000)}
           throw new Error('語音轉文字結果為空，請確認音訊是否清晰、有人聲');
         }
 
-        // 若檔案很大但逐字稿異常短，提示可能被 ASR 截斷
         const sizeMB = file.size / (1024 * 1024);
-        const expectedMinChars = sizeMB * 800; // 粗估
+        const expectedMinChars = sizeMB * 800;
         if (sizeMB > 8 && transcript.length < expectedMinChars * 0.25) {
           console.warn('ASR 回傳字數相對檔案大小偏少，可能被服務端截斷');
           setStatus(`① 轉寫完成（${transcript.length} 字）。注意：檔案較大但字數偏少，ASR 可能有時長限制。繼續分段整理…`, 'info');
           await new Promise(r => setTimeout(r, 800));
         }
 
-        const { points, notesMd, mindmapMd, transcriptText } =
-          await generateContentSegmented(transcript);
+        const parsedResult = await generateContentSegmented(transcript);
+        currentFullData = parsedResult;
+        currentChatHistory = [];
 
-        renderPoints(points);
-        renderNotes(notesMd);
-        renderTranscript(transcriptText, transcript);
-        pendingMindmapMd = mindmapMd || null;
+        renderPoints(parsedResult.points);
+        renderNotes(parsedResult.notesMd);
+        renderTranscript(parsedResult.transcriptText, transcript);
+        pendingMindmapMd = parsedResult.mindmapMd || null;
+
+        renderChatMessages();
+
+        saveHistoryItem({
+          fileName: currentFileName,
+          timestamp: Date.now(),
+          transcript: transcript,
+          summaryText: parsedResult.notesMd.slice(0, 100),
+          data: parsedResult,
+          chatHistory: []
+        });
 
         const activeTab = document.querySelector('.tab.active');
         if (activeTab && activeTab.dataset.tab === 'mindmap') {
@@ -827,7 +1249,7 @@ ${combinedNotes.slice(0, 20000)}
         const chunkInfo = transcript.length > CHUNK_SIZE
           ? `（原文 ${transcript.length.toLocaleString()} 字，已分段整理）`
           : '';
-        setStatus(`完成！已產生重點、筆記、完整逐字稿${chunkInfo}。請點「心智圖」查看圖表。`, 'success');
+        setStatus(`完成！已產生重點、筆記、完整逐字稿${chunkInfo}。請點「心智圖」或「AI 檔案對話」。`, 'success');
       } catch (err) {
         console.error(err);
         stopTimer(false);
@@ -848,12 +1270,16 @@ ${combinedNotes.slice(0, 20000)}
       resetTimer();
       showFileInfo(null);
       pendingMindmapMd = null;
+      currentFileName = '';
+      currentFullData = null;
+      currentChatHistory = [];
       if (currentMarkmap) {
         try { currentMarkmap.destroy(); } catch (e) {}
         currentMarkmap = null;
       }
     });
 
+    renderHistoryList();
     setStatus('準備就緒，請選擇音訊檔案', 'info');
   </script>
 </body>
