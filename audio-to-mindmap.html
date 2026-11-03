@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>音訊 → 重點整理與心智圖</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18"></script>
+
+  <!-- 引入 OpenCC 繁簡轉換庫，強制轉為香港繁體 -->
+
+  <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+
+  <style>
+
+    :root {
+
+      --bg: #0f172a; --card: #1e293b; --border: #334155;
+
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+
+      --success: #4ade80; --danger: #f87171;
+
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+
+      font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
+
+      background: var(--bg); color: var(--text); line-height: 1.7;
+
+      min-height: 100vh; padding: 20px;
+
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    h1 { font-size: 1.75rem; margin-bottom: 6px; }
+
+    .subtitle { color: var(--muted); margin-bottom: 24px; font-size: 0.95rem; }
+
+    .card {
+
+      background: var(--card); border: 1px solid var(--border);
+
+      border-radius: 12px; padding: 22px; margin-bottom: 20px;
+
+    }
+
+    label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 8px; }
+
+    input[type="file"] {
+
+      width: 100%; background: #0f172a; border: 1px solid var(--border);
+
+      border-radius: 8px; color: var(--text); padding: 12px; font-size: 0.95rem;
+
+    }
+
+    .btn {
+
+      background: var(--accent); color: #0f172a; border: none;
+
+      border-radius: 8px; padding: 12px 28px; font-weight: 600;
+
+      font-size: 1rem; cursor: pointer;
+
+    }
+
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+
+    }
+
+    #status {
+
+      margin-top: 14px; font-size: 0.95rem; min-height: 28px;
+
+      padding: 8px 12px; border-radius: 6px;
+
+    }
+
+    #status.error { background: #450a0a; color: var(--danger); }
+
+    #status.success { background: #052e16; color: var(--success); }
+
+    #status.info { background: #0c4a6e; color: var(--accent); }
+
+    #timing {
+
+      margin-top: 10px;
+
+      font-size: 0.95rem;
+
+      color: var(--muted);
+
+      min-height: 24px;
+
+      display: none;
+
+    }
+
+    #timing.visible { display: block; }
+
+    #timing .elapsed {
+
+      color: var(--accent);
+
+      font-weight: 600;
+
+      font-variant-numeric: tabular-nums;
+
+    }
+
+    #timing.done .elapsed {
+
+      color: var(--success);
+
+    }
+
+    .tabs {
+
+      display: flex; gap: 8px; margin-bottom: 18px;
+
+      border-bottom: 1px solid var(--border); padding-bottom: 10px; flex-wrap: wrap;
+
+    }
+
+    .tab {
+
+      background: transparent; border: none; color: var(--muted);
+
+      padding: 8px 16px; cursor: pointer; border-radius: 6px; font-size: 0.95rem;
+
+    }
+
+    .tab.active { background: #334155; color: var(--text); }
+
+    .panel { display: none; }
+
+    .panel.active { display: block; }
+
+
+
+    #mindmap-container {
+
+      width: 100%; height: 580px; background: #0f172a;
+
+      border-radius: 8px; overflow: hidden;
+
+    }
+
+    #mindmap-container svg { width: 100%; height: 100%; }
+
+    #mindmap-container foreignObject div,
+
+    #mindmap-container foreignObject span,
+
+    #mindmap-container text {
+
+      color: #f8fafc !important;
+
+      fill: #f8fafc !important;
+
+      font-size: 14px !important;
+
+      font-weight: 500 !important;
+
+    }
+
+
+
+    .hint { font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+
+
+
+    .points-wrap { display: flex; flex-direction: column; gap: 14px; }
+
+    .point-card {
+
+      background: #0f172a;
+
+      border: 1px solid var(--border);
+
+      border-left: 4px solid var(--accent);
+
+      border-radius: 10px;
+
+      padding: 16px 18px 16px 20px;
+
+    }
+
+    .point-num {
+
+      display: inline-block;
+
+      background: #0c4a6e;
+
+      color: var(--accent);
+
+      font-size: 0.78rem;
+
+      font-weight: 700;
+
+      padding: 2px 10px;
+
+      border-radius: 999px;
+
+      margin-bottom: 8px;
+
+    }
+
+    .point-text {
+
+      font-size: 1.02rem;
+
+      line-height: 1.75;
+
+      color: var(--text);
+
+    }
+
+
+
+    .notes-box {
+
+      background: #0f172a;
+
+      border: 1px solid var(--border);
+
+      border-radius: 10px;
+
+      padding: 22px 24px;
+
+      line-height: 1.8;
+
+    }
+
+    .notes-box h1 {
+
+      font-size: 1.3rem; margin: 22px 0 10px; color: var(--accent);
+
+      border-bottom: 1px solid var(--border); padding-bottom: 6px;
+
+    }
+
+    .notes-box h1:first-child { margin-top: 0; }
+
+    .notes-box h2 { font-size: 1.12rem; margin: 16px 0 8px; color: #7dd3fc; }
+
+    .notes-box h3 { font-size: 1.02rem; margin: 12px 0 6px; color: #a5f3fc; }
+
+    .notes-box p { margin-bottom: 10px; color: var(--text); }
+
+    .notes-box ul, .notes-box ol { padding-left: 22px; margin-bottom: 12px; }
+
+    .notes-box li { margin-bottom: 6px; }
+
+    .notes-box code {
+
+      background: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 0.9em;
+
+    }
+
+    .empty-hint { color: var(--muted); font-size: 0.95rem; padding: 12px 0; }
+
+
+
+    .raw-transcript-box {
+
+      background: #0f172a;
+
+      border: 1px solid var(--border);
+
+      border-left: 4px solid var(--accent);
+
+      border-radius: 10px;
+
+      padding: 16px 18px;
+
+    }
+
+    .raw-transcript-box .point-num {
+
+      margin-bottom: 10px;
+
+    }
+
+    .raw-transcript-body {
+
+      white-space: pre-wrap;
+
+      line-height: 1.85;
+
+      font-size: 0.98rem;
+
+      color: var(--text);
+
+      max-height: 520px;
+
+      overflow: auto;
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>🎧 音訊 → 重點整理與心智圖</h1>
+
+    <p class="subtitle">上傳音訊，自動轉錄並產生重點、筆記與心智圖</p>
+
+
+
+    <div class="card">
+
+      <label>選擇音訊檔案（支援 MP3、WAV、M4A、OGG 等）</label>
+
+      <input type="file" id="audioFile" accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.flac" />
+
+      <div class="hint">建議檔案大小不超過 25MB。過長的音訊可能需要較長處理時間。</div>
+
+
+
+      <div style="margin-top: 22px; display: flex; gap: 12px; flex-wrap: wrap;">
+
+        <button class="btn" id="generateBtn">開始產生重點與心智圖</button>
+
+        <button class="btn btn-secondary" id="clearBtn">清除</button>
+
+      </div>
+
+      <div id="status"></div>
+
+      <div id="timing"></div>
+
+    </div>
+
+
+
+    <div class="card" id="results" style="display: none;">
+
+      <div class="tabs">
+
+        <button class="tab active" data-tab="points">重點內容</button>
+
+        <button class="tab" data-tab="notes">整理筆記</button>
+
+        <button class="tab" data-tab="mindmap">心智圖</button>
+
+        <button class="tab" data-tab="transcript">逐字稿</button>
+
+      </div>
+
+
+
+      <div id="panel-points" class="panel active">
+
+        <div class="points-wrap" id="pointsList"></div>
+
+      </div>
+
+
+
+      <div id="panel-notes" class="panel">
+
+        <div class="notes-box" id="notesContent"></div>
+
+      </div>
+
+
+
+      <div id="panel-mindmap" class="panel">
+
+        <div id="mindmap-container"></div>
+
+      </div>
+
+
+
+      <div id="panel-transcript" class="panel">
+
+        <div id="transcriptBox"></div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <script>
+
+    // ========== 矽基流動設定 ==========
+
+    const API_BASE_URL = "https://api.siliconflow.cn/v1";
+
+    const API_KEY      = "sk-kqrsiandfirxhbknbthmkibjqlqncpwdyqpqxtinddzkpigz";
+
+    const WHISPER_MODEL = "XingChenAGI/XingChenASR-V3.2-Ultra";
+
+    const LLM_MODEL     = "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B";
+
+    // ==================================
+
+
+
+    const $ = id => document.getElementById(id);
+
+    let currentMarkmap = null;
+
+    let pendingMindmapMd = null;
+
+    const converter = OpenCC.Converter({ from: 'cn', to: 'hk' });
+
+
+
+    // ========== 計時器 ==========
+
+    let startTime = null;
+
+    let timerInterval = null;
+
+
+
+    function formatDuration(ms) {
+
+      const totalSec = Math.floor(ms / 1000);
+
+      const min = Math.floor(totalSec / 60);
+
+      const sec = totalSec % 60;
+
+      if (min > 0) {
+
+        return `${min} 分 ${sec} 秒`;
+
+      }
+
+      return `${sec} 秒`;
+
+    }
+
+
+
+    function startTimer() {
+
+      startTime = Date.now();
+
+      const el = $('timing');
+
+      el.classList.add('visible');
+
+      el.classList.remove('done');
+
+      el.innerHTML = `⏳ 處理中… 已用時 <span class="elapsed">0 秒</span>`;
+
+
+
+      if (timerInterval) clearInterval(timerInterval);
+
+      timerInterval = setInterval(() => {
+
+        const elapsed = Date.now() - startTime;
+
+        el.innerHTML = `⏳ 處理中… 已用時 <span class="elapsed">${formatDuration(elapsed)}</span>`;
+
+      }, 1000);
+
+    }
+
+
+
+    function stopTimer(success = true) {
+
+      if (timerInterval) {
+
+        clearInterval(timerInterval);
+
+        timerInterval = null;
+
+      }
+
+      if (!startTime) return;
+
+      const elapsed = Date.now() - startTime;
+
+      const el = $('timing');
+
+      el.classList.add('visible');
+
+      el.classList.add('done');
+
+      if (success) {
+
+        el.innerHTML = `✅ 總處理時間：<span class="elapsed">${formatDuration(elapsed)}</span>`;
+
+      } else {
+
+        el.innerHTML = `⚠️ 處理中斷，已用時 <span class="elapsed">${formatDuration(elapsed)}</span>`;
+
+      }
+
+      startTime = null;
+
+    }
+
+
+
+    function resetTimer() {
+
+      if (timerInterval) {
+
+        clearInterval(timerInterval);
+
+        timerInterval = null;
+
+      }
+
+      startTime = null;
+
+      const el = $('timing');
+
+      el.classList.remove('visible', 'done');
+
+      el.innerHTML = '';
+
+    }
+
+
+
+    function setStatus(msg, type = 'info') {
+
+      const el = $('status');
+
+      el.textContent = msg;
+
+      el.className = type;
+
+      console.log('[狀態]', msg);
+
+    }
+
+
+
+    function escapeHtml(str) {
+
+      return String(str)
+
+        .replace(/&/g, '&amp;')
+
+        .replace(/</g, '&lt;')
+
+        .replace(/>/g, '&gt;')
+
+        .replace(/"/g, '&quot;');
+
+    }
+
+
+
+    // ========== 分頁切換 ==========
+
+    document.querySelectorAll('.tab').forEach(tab => {
+
+      tab.addEventListener('click', () => {
+
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+        tab.classList.add('active');
+
+        const targetId = `panel-${tab.dataset.tab}`;
+
+        $(targetId).classList.add('active');
+
+
+
+        if (tab.dataset.tab === 'mindmap') {
+
+          setTimeout(() => {
+
+            if (pendingMindmapMd) {
+
+              window.renderMarkmap(pendingMindmapMd);
+
+            } else if (currentMarkmap) {
+
+              try { currentMarkmap.fit(); } catch (e) {}
+
+            }
+
+          }, 150);
+
+        }
+
+      });
+
+    });
+
+
+
+    // ========== 語音轉文字 ==========
+
+    async function transcribe(file) {
+
+      const formData = new FormData();
+
+      formData.append('file', file);
+
+      formData.append('model', WHISPER_MODEL);
+
+
+
+      const res = await fetch(`${API_BASE_URL}/audio/transcriptions`, {
+
+        method: 'POST',
+
+        headers: { 'Authorization': `Bearer ${API_KEY}` },
+
+        body: formData
+
+      });
+
+
+
+      if (!res.ok) {
+
+        const err = await res.text();
+
+        throw new Error(`語音轉文字失敗 (${res.status})：${err}`);
+
+      }
+
+
+
+      const data = await res.json();
+
+      return data.text || (typeof data === 'string' ? data : '') || '';
+
+    }
+
+
+
+    // ========== LLM 整理 ==========
+
+    async function generateContent(transcript) {
+
+      const prompt = `你是一個專業的繁體中文筆記整理助手。
+
+【絕對指令】：
+
+輸出文字必須【全部】使用標準【繁體中文】或【英文】，絕對禁止出現任何簡體字。
+請修正語音識別的錯字與標點，但【必須保留完整內容與原意】，不可刪成摘要、不可改寫成碎片短句。
+
+
+忽略（僅在明顯是這些內容時）：老師/學校/郵箱資訊、作業練習題說明、純開場白與寒暄。正文一律完整保留。
+
+
+
+【重點內容】規則：
+
+每一條必須是完整句子（1～2 句）
+詳細描述，忠於原文
+
+
+【整理筆記】：
+
+用 # / ## / ### 整理知識點
+提取文中的關鍵名詞、專有名詞並附上白話解釋
+依照主題或邏輯分段，並使用標題（H2 / H3）層級分明。
+將冗長的敘述改為條列式（Bullet points），並將關鍵字、專有名詞、數字或時間加粗
+行動清單（Action Items）： 如果內容包含待辦事項、下一步或決策點，請在最下方獨立列出。
+疑點標註： 如果原文邏輯不清、有錯別字或資訊不完整，請在文末用「⚠️ 待確認事項」列出。
+
+
+【心智圖】：階層 Markdown，適合心智圖
+
+
+
+【逐字稿】規則：
+
+必須保留逐字稿的【完整內容】
+不要刪減、不要改寫成摘要
+
+
+請嚴格依下列格式輸出：
+
+
+
+【重點內容】
+
+完整句子一……
+完整句子二……
+
+
+【整理筆記】
+
+# 知識點一
+
+說明內容...
+
+
+
+【心智圖】
+
+# 主題
+
+## 主要分類一
+
+### 子項目
+
+
+
+【逐字稿】
+
+完整逐字稿原文內容……
+
+
+
+逐字稿原文：
+
+"""
+
+${transcript.slice(0, 28000)}
+
+"""`;
+
+
+
+      const res = await fetch(`${API_BASE_URL}/chat/completions`, {
+
+        method: 'POST',
+
+        headers: {
+
+          'Authorization': `Bearer ${API_KEY}`,
+
+          'Content-Type': 'application/json'
+
+        },
+
+        body: JSON.stringify({
+
+          model: LLM_MODEL,
+
+          messages: [
+
+            {
+
+              role: 'system',
+
+              content: 'You are a professional Traditional Chinese editor. You MUST output ALL text in strict Traditional Chinese. Never use simplified Chinese characters.'
+
+            },
+
+            { role: 'user', content: prompt }
+
+          ],
+
+          temperature: 0.1,
+
+          max_tokens: 5000
+
+        })
+
+      });
+
+
+
+      if (!res.ok) {
+
+        const err = await res.text();
+
+        throw new Error(`AI 整理失敗 (${res.status})：${err}`);
+
+      }
+
+
+
+      const data = await res.json();
+
+      let rawContent = data.choices[0].message.content.trim();
+
+      return converter(rawContent);
+
+    }
+
+
+
+    // ========== 解析 ==========
+
+    function parseAIResponse(text) {
+
+      let points = [];
+
+      let notesMd = '';
+
+      let mindmapMd = '';
+
+      let transcriptText = '';
+
+
+
+      const pointsMatch   = text.match(/【重點內容】([\s\S]*?)(?=【整理筆記】|【心智圖】|【逐字稿|$)/i);
+
+      const notesMatch    = text.match(/【整理筆記】([\s\S]*?)(?=【心智圖】|【逐字稿|$)/i);
+
+      const mindMatch     = text.match(/【心智圖】([\s\S]*?)(?=【逐字稿|$)/i);
+
+      const transcriptMatch = text.match(/【逐字稿】([\s\S]*)/i);
+
+
+
+      if (pointsMatch) {
+
+        points = pointsMatch[1]
+
+          .split('\n')
+
+          .map(line => line.replace(/^[-•*]\s*/, '').replace(/^\d+[\.、]\s*/, '').trim())
+
+          .filter(line => line.length > 4);
+
+      }
+
+
+
+      if (notesMatch) {
+
+        notesMd = notesMatch[1].trim()
+
+          .replace(/^```(?:markdown)?\s*/i, '')
+
+          .replace(/```$/, '')
+
+          .trim();
+
+      }
+
+
+
+      if (mindMatch) {
+
+        mindmapMd = mindMatch[1].trim()
+
+          .replace(/^```(?:markdown)?\s*/i, '')
+
+          .replace(/```$/, '')
+
+          .trim();
+
+      } else if (notesMd) {
+
+        mindmapMd = notesMd;
+
+      }
+
+
+
+      if (transcriptMatch) {
+
+        transcriptText = transcriptMatch[1].trim();
+
+      }
+
+
+
+      return { points, notesMd, mindmapMd, transcriptText };
+
+    }
+
+
+
+    // ========== 渲染：重點 ==========
+
+    function renderPoints(points) {
+
+      const wrap = $('pointsList');
+
+      wrap.innerHTML = '';
+
+      if (!points.length) {
+
+        wrap.innerHTML = '<p class="empty-hint">未能提取到明確重點，請查看「整理筆記」分頁。</p>';
+
+        return;
+
+      }
+
+      points.forEach((p, i) => {
+
+        const card = document.createElement('div');
+
+        card.className = 'point-card';
+
+        card.innerHTML = `
+
+          <span class="point-num">重點 ${i + 1}</span>
+
+          <div class="point-text">${escapeHtml(p)}</div>
+
+        `;
+
+        wrap.appendChild(card);
+
+      });
+
+    }
+
+
+
+    // ========== 渲染：筆記 ==========
+
+    function simpleMarkdownToHtml(md) {
+
+      if (!md) return '<p class="empty-hint">尚無整理筆記</p>';
+
+      let html = escapeHtml(md);
+
+      html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+
+      html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+
+      html = html.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+
+      html = html.replace(/\n{2,}/g, '</p><p>');
+
+      html = '<p>' + html + '</p>';
+
+      html = html.replace(/<p><\/p>/g, '');
+
+      html = html.replace(/<p>(<h[1-3]>)/g, '$1');
+
+      html = html.replace(/(<\/h[1-3]>)<\/p>/g, '$1');
+
+      html = html.replace(/<p>(<ul>)/g, '$1');
+
+      html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+
+      return html;
+
+    }
+
+
+
+    function renderNotes(md) {
+
+      $('notesContent').innerHTML = simpleMarkdownToHtml(md);
+
+    }
+
+
+
+    // ========== 渲染：逐字稿 ==========
+
+    function renderTranscript(text, rawFallback) {
+
+      const content = text && text.length > 10 ? text : rawFallback;
+
+      $('transcriptBox').innerHTML = `
+
+        <div class="raw-transcript-box">
+
+          <span class="point-num">完整逐字稿</span>
+
+          <div class="raw-transcript-body">${escapeHtml(content || '（無）')}</div>
+
+        </div>
+
+      `;
+
+    }
+
+
+
+    // ========== 心智圖安全渲染函數 ==========
+
+    window.renderMarkmap = function(markdown) {
+
+      try {
+
+        if (!markdown || !String(markdown).trim()) return;
+
+        const container = $('mindmap-container');
+
+        if (container.clientWidth < 10 || container.clientHeight < 10) {
+
+          pendingMindmapMd = markdown;
+
+          return;
+
+        }
+
+
+
+        const { Transformer, Markmap } = window.markmap;
+
+        const transformer = new Transformer();
+
+        const { root } = transformer.transform(markdown);
+
+
+
+        container.innerHTML = '';
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+
+        svg.setAttribute('width', '100%');
+
+        svg.setAttribute('height', '100%');
+
+        container.appendChild(svg);
+
+
+
+        if (currentMarkmap) {
+
+          try { currentMarkmap.destroy(); } catch (e) {}
+
+          currentMarkmap = null;
+
+        }
+
+
+
+        currentMarkmap = Markmap.create(svg, {
+
+          autoFit: true,
+
+          duration: 400,
+
+          maxWidth: 360,
+
+          colorFreezeLevel: 2,
+
+          paddingX: 12,
+
+          spacingVertical: 12,
+
+          spacingHorizontal: 80,
+
+          style: (id) => `
+
+            ${id} { --markmap-text-color: #f8fafc; }
+
+            ${id} a { color: #f8fafc; }
+
+            ${id} foreignObject > div {
+
+              color: #f8fafc !important;
+
+              font-size: 14px !important;
+
+              font-weight: 500 !important;
+
+              line-height: 1.4 !important;
+
+              text-shadow: 0 1px 2px rgba(0,0,0,0.65);
+
+            }
+
+            ${id} circle { stroke-width: 2px; }
+
+          `
+
+        }, root);
+
+
+
+        setTimeout(() => {
+
+          if (currentMarkmap) currentMarkmap.fit();
+
+        }, 100);
+
+        pendingMindmapMd = markdown;
+
+      } catch (e) {
+
+        console.error('心智圖渲染失敗', e);
+
+      }
+
+    };
+
+
+
+    // ========== 主流程 ==========
+
+    $('generateBtn').addEventListener('click', async () => {
+
+      setStatus('開始檢查…', 'info');
+
+
+
+      const file = $('audioFile').files[0];
+
+      if (!file) {
+
+        setStatus('請先選擇音訊檔案', 'error');
+
+        return;
+
+      }
+
+      if (!API_KEY || API_KEY.length < 10) {
+
+        setStatus('請先在 HTML 中填入正確的 API_KEY', 'error');
+
+        return;
+
+      }
+
+
+
+      const btn = $('generateBtn');
+
+      btn.disabled = true;
+
+      $('results').style.display = 'none';
+
+
+
+      pendingMindmapMd = null;
+
+      if (currentMarkmap) {
+
+        try { currentMarkmap.destroy(); } catch (e) {}
+
+        currentMarkmap = null;
+
+      }
+
+      $('mindmap-container').innerHTML = '';
+
+
+
+      startTimer();
+
+
+
+      try {
+
+        setStatus('① 正在語音轉文字，請稍候…', 'info');
+
+        const transcript = await transcribe(file);
+
+        if (!transcript || transcript.trim().length < 5) {
+
+          throw new Error('語音轉文字結果為空，請確認音訊是否清晰、有人聲');
+
+        }
+
+
+
+        setStatus('② 正在整理重點與心智圖（繁體中文）…', 'info');
+
+        const aiText = await generateContent(transcript);
+
+        const { points, notesMd, mindmapMd, transcriptText } = parseAIResponse(aiText);
+
+
+
+        renderPoints(points);
+
+        renderNotes(notesMd);
+
+        renderTranscript(transcriptText, transcript);
+
+
+
+        pendingMindmapMd = mindmapMd || null;
+
+
+
+        const activeTab = document.querySelector('.tab.active');
+
+        if (activeTab && activeTab.dataset.tab === 'mindmap') {
+
+          setTimeout(() => window.renderMarkmap(pendingMindmapMd), 100);
+
+        }
+
+
+
+        $('results').style.display = 'block';
+
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+        document.querySelector('[data-tab="points"]').classList.add('active');
+
+        $('panel-points').classList.add('active');
+
+
+
+        stopTimer(true);
+
+        setStatus('完成！已產生重點、筆記、完整逐字稿。請點「心智圖」查看圖表。', 'success');
+
+      } catch (err) {
+
+        console.error(err);
+
+        stopTimer(false);
+
+        setStatus(err.message || '發生錯誤', 'error');
+
+      } finally {
+
+        btn.disabled = false;
+
+      }
+
+    });
+
+
+
+    $('clearBtn').addEventListener('click', () => {
+
+      $('audioFile').value = '';
+
+      $('transcriptBox').innerHTML = '';
+
+      $('pointsList').innerHTML = '';
+
+      $('notesContent').innerHTML = '';
+
+      $('mindmap-container').innerHTML = '';
+
+      $('results').style.display = 'none';
+
+      setStatus('');
+
+      resetTimer();
+
+      pendingMindmapMd = null;
+
+      if (currentMarkmap) {
+
+        try { currentMarkmap.destroy(); } catch (e) {}
+
+        currentMarkmap = null;
+
+      }
+
+    });
+
+
+
+    setStatus('準備就緒，請選擇音訊檔案', 'info');
+
+  </script>
+
+</body>
+
+</html>
